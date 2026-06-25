@@ -1,0 +1,315 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LanFileTransfer.MainWindow"
+        Title="LanFileTransfer 网线直连传输"
+        Width="1040"
+        Height="760"
+        MinWidth="920"
+        MinHeight="680"
+        Background="#F5F7FA"
+        Icon="avares://LanFileTransfer/Assets/AppIcon.ico"
+        WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#D8DEE8" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#667085" />
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#2563EB" />
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#1D4ED8" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#DC2626" />
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="#344054" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,12,12" />
+    </Style>
+    <Style Selector="TextBox, NumericUpDown, ListBox">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#1F2937" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="MinWidth" Value="132" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{StaticResource PrimaryHoverBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource PrimaryHoverBrush}" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+      <Setter Property="BorderBrush" Value="#F3B4B4" />
+    </Style>
+    <Style Selector="TabControl">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Padding" Value="16,9" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Border.optionIcon">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="#EEF4FF" />
+      <Setter Property="BorderBrush" Value="#C7D7FE" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="18">
+    <Border Grid.Row="0"
+            Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="18,14"
+            Margin="0,0,0,14">
+      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+        <StackPanel Grid.Column="0" Spacing="3">
+          <TextBlock Text="网线直连文件传输" FontSize="22" FontWeight="SemiBold" Foreground="#111827" />
+          <TextBlock Name="IpInfoText" FontSize="13" Foreground="{StaticResource MutedBrush}" />
+        </StackPanel>
+        <Border Grid.Column="1"
+                Background="#EEF4FF"
+                BorderBrush="#C7D7FE"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="10,6"
+                VerticalAlignment="Center">
+          <TextBlock Text="192.168.10.x" Foreground="#1D4ED8" FontWeight="SemiBold" />
+        </Border>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
+      <Border Grid.Row="0"
+              Background="{StaticResource PanelBrush}"
+              BorderBrush="{StaticResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6"
+              Margin="0,0,0,12">
+        <TabControl Name="Tabs" Padding="0">
+          <TabItem Header="接收文件">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="18,18,18,16">
+              <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="保存目录" />
+              <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                <TextBox Name="RecvOutBox" Watermark="选择保存目录" Margin="0,0,8,0" />
+                <Button Grid.Column="1" Name="ChooseRecvOutButton" Content="浏览" MinWidth="78" />
+              </Grid>
+
+              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="监听端口" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Name="RecvPortBox" Minimum="1" Maximum="65535" Width="148" HorizontalAlignment="Left" Margin="0,0,0,12" />
+
+              <TextBlock Classes="label" Grid.Row="2" Grid.Column="0" Text="写入策略" />
+              <CheckBox Grid.Row="2" Grid.Column="1" Name="RecvOverwriteBox" Content="同名文件直接覆盖" IsChecked="True" Margin="0,6,0,14" />
+
+              <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <Button Classes="primary" Name="StartRecvButton" Content="开始接收" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="发送全部">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="18,18,18,16">
+              <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="接收端 IP" />
+              <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                <TextBox Name="SendAllHostBox" Text="192.168.10.2" Margin="0,0,8,0" />
+                <Button Grid.Column="1" Name="DiscoverSendAllButton" Content="自动识别" MinWidth="92" />
+              </Grid>
+
+              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="端口" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Name="SendAllPortBox" Minimum="1" Maximum="65535" Width="148" HorizontalAlignment="Left" Margin="0,0,0,12" />
+
+              <TextBlock Classes="label" Grid.Row="2" Grid.Column="0" Text="并行连接" />
+              <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+                <NumericUpDown Name="SendAllParallelBox" Minimum="1" Maximum="32" Width="110" />
+                <Button Name="SpeedTestAllButton" Content="网络测速" MinWidth="92" />
+              </StackPanel>
+
+              <TextBlock Classes="label" Grid.Row="3" Grid.Column="0" Text="源目录" />
+              <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+                <TextBox Name="SendAllDirBox" Watermark="选择要完整发送的目录" Margin="0,0,8,0" />
+                <Button Grid.Column="1" Name="ChooseSendAllDirButton" Content="浏览" MinWidth="78" />
+              </Grid>
+
+              <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <Button Classes="primary" Name="StartSendAllButton" Content="发送全部文件" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="发送选择">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="18,18,18,16">
+              <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="接收端 IP" />
+              <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                <TextBox Name="SendSelectedHostBox" Text="192.168.10.2" Margin="0,0,8,0" />
+                <Button Grid.Column="1" Name="DiscoverSendSelectedButton" Content="自动识别" MinWidth="92" />
+              </Grid>
+
+              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="端口" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Name="SendSelectedPortBox" Minimum="1" Maximum="65535" Width="148" HorizontalAlignment="Left" Margin="0,0,0,12" />
+
+              <TextBlock Classes="label" Grid.Row="2" Grid.Column="0" Text="并行连接" />
+              <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+                <NumericUpDown Name="SendSelectedParallelBox" Minimum="1" Maximum="32" Width="110" />
+                <Button Name="SpeedTestSelectedButton" Content="网络测速" MinWidth="92" />
+              </StackPanel>
+
+              <TextBlock Classes="label" Grid.Row="3" Grid.Column="0" Text="已选择" VerticalAlignment="Top" Margin="0,7,12,12" />
+              <ListBox Grid.Row="3" Grid.Column="1" Name="SelectedListBox" SelectionMode="Multiple" MinHeight="104" Margin="0,0,0,12" />
+
+              <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+                <Button Name="AddFilesButton" Content="添加文件" />
+                <Button Name="AddFolderButton" Content="添加文件夹" />
+                <Button Name="RemoveSelectedButton" Content="移除选中" />
+                <Button Name="ClearSelectedButton" Content="清空" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <Button Classes="primary" Name="StartSendSelectedButton" Content="发送选择文件" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="系统迁移">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="18,18,18,16">
+              <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="迁移包" />
+              <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+                <TextBox Name="MigrationPackageBox" Watermark="选择或输入迁移包 zip 路径" Margin="0,0,8,0" />
+                <Button Grid.Column="1" Name="ChooseMigrationSaveButton" Content="保存到" MinWidth="82" Margin="0,0,8,0" />
+                <Button Grid.Column="2" Name="ChooseMigrationOpenButton" Content="打开包" MinWidth="82" />
+              </Grid>
+
+              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="环境变量" />
+              <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <CheckBox Name="IncludeMachineEnvBox" Content="包含选中的机器环境变量" IsChecked="False" VerticalAlignment="Center" />
+                <Button Name="RefreshEnvListButton" Content="刷新变量" MinWidth="82" />
+                <Button Name="SelectAllEnvButton" Content="全选" MinWidth="70" />
+                <Button Name="ClearEnvButton" Content="清空" MinWidth="70" />
+              </StackPanel>
+
+              <TextBlock Classes="label" Grid.Row="2" Grid.Column="0" Text="选择项" VerticalAlignment="Top" Margin="0,7,12,12" />
+              <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,*" Margin="0,0,0,12">
+                <Grid RowDefinitions="Auto,*" Margin="0,0,8,0">
+                  <TextBlock Text="环境变量" Foreground="#344054" FontWeight="SemiBold" Margin="0,0,0,6" />
+                  <ListBox Grid.Row="1" Name="EnvironmentListBox" Height="150" MaxHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding DisplayName}" Margin="4,3" />
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Grid>
+                <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*" Margin="8,0,0,0">
+                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
+                    <TextBlock Text="注册表软件项" Foreground="#344054" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <CheckBox Name="IncludeUserRegistryBox" Content="包含选中项" IsChecked="False" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,6">
+                    <Button Name="RefreshRegistryListButton" Content="刷新列表" MinWidth="82" />
+                    <Button Name="SelectAllRegistryButton" Content="全选" MinWidth="70" />
+                    <Button Name="ClearRegistryButton" Content="清空" MinWidth="70" />
+                  </StackPanel>
+                  <ListBox Grid.Row="2" Name="RegistrySoftwareListBox" Height="150" MaxHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="Auto,Auto,*" Margin="4,3">
+                          <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                          <Border Grid.Column="1" Classes="optionIcon" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <TextBlock Text="A" Foreground="#2563EB" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          </Border>
+                          <StackPanel Grid.Column="2" Spacing="1">
+                            <TextBlock Text="{Binding DisplayName}" Foreground="#111827" />
+                            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                          </StackPanel>
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Grid>
+              </Grid>
+
+              <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+                <Button Classes="primary" Name="ExportMigrationButton" Content="生成迁移包" />
+                <Button Name="ImportMigrationButton" Content="导入迁移包" MinWidth="112" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="4" Grid.Column="1"
+                         Text="环境变量和注册表都只会迁移列表中选中的项目。导入前请确认目标电脑已安装对应软件。"
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource MutedBrush}"
+                         FontSize="12" />
+            </Grid>
+          </TabItem>
+        </TabControl>
+      </Border>
+
+      <Border Grid.Row="1"
+              Background="{StaticResource PanelBrush}"
+              BorderBrush="{StaticResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="14,12"
+              Margin="0,0,0,12">
+        <Grid RowDefinitions="Auto,Auto">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Name="ProgressText" Text="未开始" Foreground="#344054" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="实时进度" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Center" />
+          </Grid>
+          <ProgressBar Grid.Row="1" Name="TransferProgressBar" Minimum="0" Maximum="100" Height="10" Margin="0,8,0,0" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="2"
+              Background="{StaticResource PanelBrush}"
+              BorderBrush="{StaticResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="0">
+        <Grid RowDefinitions="Auto,*">
+          <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,10">
+            <TextBlock Text="运行日志" FontWeight="SemiBold" Foreground="#111827" />
+          </Border>
+          <TextBox Grid.Row="1"
+                   Name="LogBox"
+                   IsReadOnly="True"
+                   AcceptsReturn="True"
+                   TextWrapping="NoWrap"
+                   FontFamily="Consolas, Microsoft YaHei UI"
+                   FontSize="12"
+                   BorderThickness="0"
+                   Background="#FFFFFF"
+                   Padding="12" />
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2"
+            Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="12">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Name="StatusText" Text="就绪" VerticalAlignment="Center" Foreground="#344054" />
+        <Button Grid.Column="1" Name="OpenToolDirButton" Content="打开工具目录" Margin="0,0,10,0" />
+        <Button Grid.Column="2" Classes="danger" Name="StopButton" Content="停止" IsEnabled="False" MinWidth="82" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
