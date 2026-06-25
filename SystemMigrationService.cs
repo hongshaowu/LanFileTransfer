@@ -20,24 +20,48 @@ internal sealed class SystemMigrationService
         "Windows",
         "Recovery",
         "Temp",
-        "tmp"
+        "tmp",
+        "bin",
+        "lib",
+        "libs",
+        "runtime",
+        "runtimes",
+        "redist",
+        "vc_redist",
+        "drivers",
+        "plugins",
+        "resources",
+        "locales"
     };
 
     private static readonly string[] SkippedExecutableNameParts =
     {
+        "agent",
+        "bootstrap",
+        "bootstrapper",
         "unins",
         "uninstall",
         "setup",
         "install",
         "update",
         "updater",
+        "daemon",
         "crash",
+        "crashpad",
         "report",
+        "reporter",
         "repair",
         "helper",
         "service",
+        "broker",
+        "watcher",
+        "monitor",
+        "console",
+        "cmd",
+        "command",
         "vcredist",
-        "redistributable"
+        "redistributable",
+        "launcher helper"
     };
 
     public IReadOnlyList<MigrationOption> GetEnvironmentOptions(bool includeMachine)
@@ -125,34 +149,19 @@ internal sealed class SystemMigrationService
             {
                 scannedDirs++;
                 string[] files = Directory.GetFiles(dir, "*.exe", SearchOption.TopDirectoryOnly);
-                for (int i = 0; i < files.Length; i++)
+                MigrationOption? option = TryGetBestExecutableOption(dir, files, added, fallbackAdded, ref foundExeCount, ref skippedExeCount, out bool skipped);
+                if (option != null)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    string path = files[i];
-                    if (added.Contains(path) || fallbackAdded.Contains(path))
-                    {
-                        continue;
-                    }
-
-                    FileInfo fileInfo = new FileInfo(path);
-                    if (fileInfo.Length <= 0)
-                    {
-                        continue;
-                    }
-
-                    foundExeCount++;
-                    string displayName = Path.GetFileNameWithoutExtension(path);
-                    MigrationOption option = new MigrationOption(path, displayName, path);
-                    if (ShouldSkipExecutable(path))
+                    if (skipped)
                     {
                         fallbackOptions.Add(option);
-                        fallbackAdded.Add(path);
-                        skippedExeCount++;
+                        fallbackAdded.Add(option.Key);
                     }
                     else
                     {
                         options.Add(option);
-                        added.Add(path);
+                        added.Add(option.Key);
                     }
                 }
 
@@ -464,6 +473,105 @@ internal sealed class SystemMigrationService
         progress(new ApplicationScanProgress(percent, scannedDirs, discoveredDirs, foundExeCount, visibleCount, message));
     }
 
+    private static MigrationOption? TryGetBestExecutableOption(
+        string dir,
+        IReadOnlyList<string> files,
+        HashSet<string> added,
+        HashSet<string> fallbackAdded,
+        ref int foundExeCount,
+        ref int skippedExeCount,
+        out bool skipped)
+    {
+        skipped = false;
+        ExecutableCandidate? bestCandidate = null;
+        for (int i = 0; i < files.Count; i++)
+        {
+            string path = files[i];
+            if (added.Contains(path) || fallbackAdded.Contains(path))
+            {
+                continue;
+            }
+
+            FileInfo fileInfo = new FileInfo(path);
+            if (fileInfo.Length <= 0)
+            {
+                continue;
+            }
+
+            foundExeCount++;
+            bool shouldSkip = ShouldSkipExecutable(path);
+            if (shouldSkip)
+            {
+                skippedExeCount++;
+            }
+
+            ExecutableCandidate candidate = new ExecutableCandidate(path, fileInfo.Length, shouldSkip, GetExecutableScore(dir, path, fileInfo.Length, shouldSkip));
+            if (bestCandidate == null || CompareExecutableCandidates(candidate, bestCandidate.Value) < 0)
+            {
+                bestCandidate = candidate;
+            }
+        }
+
+        if (bestCandidate == null)
+        {
+            return null;
+        }
+
+        skipped = bestCandidate.Value.ShouldSkip;
+        string displayName = Path.GetFileNameWithoutExtension(bestCandidate.Value.Path);
+        return new MigrationOption(bestCandidate.Value.Path, displayName, bestCandidate.Value.Path, bestCandidate.Value.Length);
+    }
+
+    private static int GetExecutableScore(string dir, string path, long length, bool shouldSkip)
+    {
+        int score = 0;
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        string dirName = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (string.Equals(fileName, dirName, StringComparison.OrdinalIgnoreCase))
+        {
+            score -= 1000;
+        }
+
+        if (MainWindow.HasExecutableIcon(path))
+        {
+            score -= 300;
+        }
+        else
+        {
+            score += 300;
+        }
+
+        if (shouldSkip)
+        {
+            score += 800;
+        }
+
+        if (length > 0)
+        {
+            long sizeScore = Math.Min(400, length / (1024 * 1024));
+            score -= (int)sizeScore;
+        }
+
+        return score;
+    }
+
+    private static int CompareExecutableCandidates(ExecutableCandidate left, ExecutableCandidate right)
+    {
+        int scoreCompare = left.Score.CompareTo(right.Score);
+        if (scoreCompare != 0)
+        {
+            return scoreCompare;
+        }
+
+        int sizeCompare = right.Length.CompareTo(left.Length);
+        if (sizeCompare != 0)
+        {
+            return sizeCompare;
+        }
+
+        return string.Compare(left.Path, right.Path, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool ShouldSkipApplicationDirectory(string dir)
     {
         string name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -657,10 +765,16 @@ internal sealed class SystemMigrationService
 internal sealed class MigrationOption
 {
     public MigrationOption(string key, string displayName, string detail)
+        : this(key, displayName, detail, 0)
+    {
+    }
+
+    public MigrationOption(string key, string displayName, string detail, long length)
     {
         Key = key;
         DisplayName = displayName;
         Detail = detail;
+        Length = length;
     }
 
     public string Key { get; }
@@ -669,10 +783,31 @@ internal sealed class MigrationOption
 
     public string Detail { get; }
 
+    public long Length { get; }
+
     public override string ToString()
     {
         return DisplayName;
     }
+}
+
+internal readonly struct ExecutableCandidate
+{
+    public ExecutableCandidate(string path, long length, bool shouldSkip, int score)
+    {
+        Path = path;
+        Length = length;
+        ShouldSkip = shouldSkip;
+        Score = score;
+    }
+
+    public string Path { get; }
+
+    public long Length { get; }
+
+    public bool ShouldSkip { get; }
+
+    public int Score { get; }
 }
 
 internal readonly struct ApplicationScanProgress
@@ -707,6 +842,8 @@ internal sealed class SelectableMigrationOption
         Key = option.Key;
         DisplayName = option.DisplayName;
         Detail = option.Detail;
+        Length = option.Length;
+        DetailWithSize = option.Length > 0 ? MainWindow.FormatFileSize(option.Length) + "    " + option.Detail : option.Detail;
         if (File.Exists(option.Key))
         {
             Icon = MainWindow.LoadExecutableIcon(option.Key);
@@ -720,6 +857,10 @@ internal sealed class SelectableMigrationOption
     public string DisplayName { get; }
 
     public string Detail { get; }
+
+    public string DetailWithSize { get; }
+
+    public long Length { get; }
 
     public Avalonia.Media.Imaging.Bitmap? Icon { get; }
 }

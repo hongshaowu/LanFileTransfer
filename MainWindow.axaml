@@ -281,6 +281,11 @@
                 <WrapPanel Margin="0,0,0,8">
                   <Button Name="ScanAppsButton" Content="扫描应用" MinWidth="82" Margin="0,0,8,8" />
                   <Button Name="ScanCommonAppsButton" Content="扫描常用目录" MinWidth="106" Margin="0,0,8,8" />
+                  <TextBlock Text="排序" Foreground="#344054" VerticalAlignment="Center" Margin="0,0,6,8" />
+                  <ComboBox Name="StartMenuSortBox" SelectedIndex="0" MinWidth="120" Margin="0,0,8,8">
+                    <ComboBoxItem Content="名称" />
+                    <ComboBoxItem Content="大小" />
+                  </ComboBox>
                   <Button Name="SelectAllAppsButton" Content="全选" MinWidth="70" Margin="0,0,8,8" />
                   <Button Name="ClearAppsButton" Content="清空" MinWidth="70" Margin="0,0,8,8" />
                   <Button Classes="primary" Name="AddStartMenuButton" Content="添加到开始菜单" MinWidth="132" Margin="0,0,8,8" />
@@ -294,7 +299,7 @@
                         <Image Grid.Column="1" Source="{Binding Icon}" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <StackPanel Grid.Column="2" Spacing="1">
                           <TextBlock Text="{Binding DisplayName}" Foreground="#111827" />
-                          <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                          <TextBlock Text="{Binding DetailWithSize}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
                         </StackPanel>
                       </Grid>
                     </DataTemplate>

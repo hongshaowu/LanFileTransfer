@@ -84,6 +84,7 @@ public sealed partial class MainWindow : Window
         ChooseAppScanDirButton.Click += async (_, _) => await ChooseFolderAsync(AppScanDirBox);
         ScanAppsButton.Click += async (_, _) => await ScanStartMenuAppsAsync();
         ScanCommonAppsButton.Click += async (_, _) => await ScanCommonStartMenuAppsAsync();
+        StartMenuSortBox.SelectionChanged += (_, _) => RefreshStartMenuList();
         SelectAllAppsButton.Click += (_, _) => SelectAllListItems(StartMenuAppListBox);
         ClearAppsButton.Click += (_, _) => SetAllOptions(_startMenuOptions, false, StartMenuAppListBox);
         AddStartMenuButton.Click += async (_, _) => await AddStartMenuShortcutsAsync();
@@ -229,19 +230,62 @@ public sealed partial class MainWindow : Window
     private void SetStartMenuOptions(IReadOnlyList<MigrationOption> options)
     {
         _startMenuOptions.Clear();
+        HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int skippedDuplicateCount = 0;
+        int skippedNoIconCount = 0;
         for (int i = 0; i < options.Count; i++)
         {
             SelectableMigrationOption option = new SelectableMigrationOption(options[i]);
+            if (option.Icon == null)
+            {
+                skippedNoIconCount++;
+                continue;
+            }
+
+            if (!names.Add(option.DisplayName))
+            {
+                skippedDuplicateCount++;
+                continue;
+            }
+
             option.IsSelected = true;
             _startMenuOptions.Add(option);
         }
 
         StartMenuAppListBox.ItemsSource = null;
-        StartMenuAppListBox.ItemsSource = _startMenuOptions.ToArray();
+        RefreshStartMenuList();
         StatusText.Text = "扫描到 " + _startMenuOptions.Count + " 个应用";
         StartMenuResultText.Text = _startMenuOptions.Count + " 个应用";
         StartMenuProgressBar.Value = 100;
         StartMenuProgressText.Text = "扫描完成";
+        if (skippedDuplicateCount > 0 || skippedNoIconCount > 0)
+        {
+            AppendLog("开始菜单结果过滤: 忽略同名 " + skippedDuplicateCount + " 个，忽略无图标 " + skippedNoIconCount + " 个");
+        }
+    }
+
+    private void RefreshStartMenuList()
+    {
+        if (StartMenuSortBox.SelectedIndex == 1)
+        {
+            _startMenuOptions.Sort((a, b) =>
+            {
+                int sizeCompare = b.Length.CompareTo(a.Length);
+                if (sizeCompare != 0)
+                {
+                    return sizeCompare;
+                }
+
+                return string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+        else
+        {
+            _startMenuOptions.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        StartMenuAppListBox.ItemsSource = null;
+        StartMenuAppListBox.ItemsSource = _startMenuOptions.ToArray();
     }
 
     private void UpdateStartMenuProgress(ApplicationScanProgress progress)
@@ -395,6 +439,7 @@ public sealed partial class MainWindow : Window
         ChooseAppScanDirButton.IsEnabled = !busy;
         ScanAppsButton.IsEnabled = !busy;
         ScanCommonAppsButton.IsEnabled = !busy;
+        StartMenuSortBox.IsEnabled = !busy;
         SelectAllAppsButton.IsEnabled = !busy;
         ClearAppsButton.IsEnabled = !busy;
         AddStartMenuButton.IsEnabled = !busy;
@@ -759,6 +804,24 @@ public sealed partial class MainWindow : Window
         {
             return null;
         }
+    }
+
+    internal static bool HasExecutableIcon(string path)
+    {
+        try
+        {
+            using System.Drawing.Icon? icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
+            return icon != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static string FormatFileSize(long bytes)
+    {
+        return LanTransferService.FormatBytes(bytes);
     }
 
     private async Task ShowMessageAsync(string message)
