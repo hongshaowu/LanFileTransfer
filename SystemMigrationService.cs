@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Win32;
 
@@ -11,6 +13,32 @@ internal sealed class SystemMigrationService
     private const string UserEnvFile = "environment-user.json";
     private const string MachineEnvFile = "environment-machine.json";
     private const string RegistryDir = "registry";
+    private static readonly string[] SkippedAppDirectoryNames =
+    {
+        "$RECYCLE.BIN",
+        "System Volume Information",
+        "Windows",
+        "Recovery",
+        "Temp",
+        "tmp"
+    };
+
+    private static readonly string[] SkippedExecutableNameParts =
+    {
+        "unins",
+        "uninstall",
+        "setup",
+        "install",
+        "update",
+        "updater",
+        "crash",
+        "report",
+        "repair",
+        "helper",
+        "service",
+        "vcredist",
+        "redistributable"
+    };
 
     public IReadOnlyList<MigrationOption> GetEnvironmentOptions(bool includeMachine)
     {
@@ -43,6 +71,109 @@ internal sealed class SystemMigrationService
 
         options.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase));
         return options;
+    }
+
+    public IReadOnlyList<MigrationOption> GetApplicationOptions(string rootDir, Action<string>? log, CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(rootDir))
+        {
+            throw new DirectoryNotFoundException("找不到应用目录: " + rootDir);
+        }
+
+        List<MigrationOption> options = new List<MigrationOption>();
+        HashSet<string> added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Stack<string> pendingDirs = new Stack<string>();
+        pendingDirs.Push(rootDir);
+        Log(log, "正在扫描应用目录: " + rootDir);
+
+        while (pendingDirs.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string dir = pendingDirs.Pop();
+            if (ShouldSkipApplicationDirectory(dir))
+            {
+                continue;
+            }
+
+            try
+            {
+                string[] files = Directory.GetFiles(dir, "*.exe", SearchOption.TopDirectoryOnly);
+                for (int i = 0; i < files.Length; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string path = files[i];
+                    if (added.Contains(path) || ShouldSkipExecutable(path))
+                    {
+                        continue;
+                    }
+
+                    FileInfo fileInfo = new FileInfo(path);
+                    if (fileInfo.Length <= 0)
+                    {
+                        continue;
+                    }
+
+                    string displayName = Path.GetFileNameWithoutExtension(path);
+                    options.Add(new MigrationOption(path, displayName, path));
+                    added.Add(path);
+                }
+
+                string[] childDirs = Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly);
+                for (int i = 0; i < childDirs.Length; i++)
+                {
+                    pendingDirs.Push(childDirs[i]);
+                }
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is PathTooLongException)
+            {
+                Log(log, "[跳过目录] " + dir + "，原因: " + ex.Message);
+            }
+        }
+
+        options.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase));
+        Log(log, "应用扫描完成，找到 " + options.Count + " 个可添加项");
+        return options;
+    }
+
+    public async Task AddStartMenuShortcutsAsync(IReadOnlyList<string> executablePaths, Action<string>? log, CancellationToken cancellationToken)
+    {
+        string startMenuDir = GetStartMenuProgramsDirectory();
+        Directory.CreateDirectory(startMenuDir);
+        Log(log, "开始菜单目录: " + startMenuDir);
+
+        for (int i = 0; i < executablePaths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string executablePath = executablePaths[i];
+            if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+            {
+                Log(log, "[跳过应用] 找不到文件: " + executablePath);
+                continue;
+            }
+
+            string shortcutName = SanitizeFileName(Path.GetFileNameWithoutExtension(executablePath)) + ".lnk";
+            string shortcutPath = GetAvailableShortcutPath(startMenuDir, shortcutName);
+            await Task.Run(() => CreateShortcut(shortcutPath, executablePath), cancellationToken);
+            Log(log, "已添加开始菜单快捷方式: " + Path.GetFileName(shortcutPath));
+        }
+
+        Log(log, "开始菜单快捷方式添加完成");
+    }
+
+    public static string GetStartMenuProgramsDirectory()
+    {
+        string path = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            return path;
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Microsoft",
+            "Windows",
+            "Start Menu",
+            "Programs");
     }
 
     public async Task ExportPackageAsync(string packagePath, IReadOnlyList<string> environmentKeys, IReadOnlyList<string> registryKeys, Action<string>? log, CancellationToken cancellationToken)
@@ -260,6 +391,106 @@ internal sealed class SystemMigrationService
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException("reg.exe " + mode + " 失败: " + error.Trim());
+        }
+    }
+
+    private static bool ShouldSkipApplicationDirectory(string dir)
+    {
+        string name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        for (int i = 0; i < SkippedAppDirectoryNames.Length; i++)
+        {
+            if (string.Equals(name, SkippedAppDirectoryNames[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ShouldSkipExecutable(string path)
+    {
+        string name = Path.GetFileNameWithoutExtension(path);
+        for (int i = 0; i < SkippedExecutableNameParts.Length; i++)
+        {
+            if (name.IndexOf(SkippedExecutableNameParts[i], StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetAvailableShortcutPath(string startMenuDir, string shortcutName)
+    {
+        string shortcutPath = Path.Combine(startMenuDir, shortcutName);
+        if (!File.Exists(shortcutPath))
+        {
+            return shortcutPath;
+        }
+
+        string nameWithoutExtension = Path.GetFileNameWithoutExtension(shortcutName);
+        for (int i = 2; i < 1000; i++)
+        {
+            string candidate = Path.Combine(startMenuDir, nameWithoutExtension + " (" + i + ").lnk");
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return Path.Combine(startMenuDir, nameWithoutExtension + "-" + Guid.NewGuid().ToString("N") + ".lnk");
+    }
+
+    private static void CreateShortcut(string shortcutPath, string targetPath)
+    {
+        Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+        if (shellType == null)
+        {
+            throw new InvalidOperationException("当前系统不支持 WScript.Shell，无法创建快捷方式");
+        }
+
+        object? shell = null;
+        object? shortcut = null;
+        try
+        {
+            shell = Activator.CreateInstance(shellType);
+            if (shell == null)
+            {
+                throw new InvalidOperationException("无法启动 WScript.Shell");
+            }
+
+            shortcut = shellType.InvokeMember(
+                "CreateShortcut",
+                BindingFlags.InvokeMethod,
+                null,
+                shell,
+                new object[] { shortcutPath });
+
+            if (shortcut == null)
+            {
+                throw new InvalidOperationException("无法创建快捷方式对象");
+            }
+
+            Type shortcutType = shortcut.GetType();
+            shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { targetPath });
+            shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(targetPath) ?? string.Empty });
+            shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetFileNameWithoutExtension(targetPath) });
+            shortcutType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { targetPath + ",0" });
+            shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, Array.Empty<object>());
+        }
+        finally
+        {
+            if (shortcut != null && Marshal.IsComObject(shortcut))
+            {
+                Marshal.FinalReleaseComObject(shortcut);
+            }
+
+            if (shell != null && Marshal.IsComObject(shell))
+            {
+                Marshal.FinalReleaseComObject(shell);
+            }
         }
     }
 

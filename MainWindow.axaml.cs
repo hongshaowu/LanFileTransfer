@@ -13,6 +13,7 @@ public sealed partial class MainWindow : Window
     private readonly List<string> _selectedPaths = new List<string>();
     private readonly List<SelectableMigrationOption> _environmentOptions = new List<SelectableMigrationOption>();
     private readonly List<SelectableMigrationOption> _registryOptions = new List<SelectableMigrationOption>();
+    private readonly List<SelectableMigrationOption> _startMenuOptions = new List<SelectableMigrationOption>();
     private readonly object _logLock = new object();
     private readonly List<string> _pendingLogs = new List<string>();
 
@@ -49,6 +50,7 @@ public sealed partial class MainWindow : Window
         SendSelectedPortBox.Value = LanTransferService.DefaultPort;
         SendAllParallelBox.Value = LanTransferService.DefaultParallelConnections;
         SendSelectedParallelBox.Value = LanTransferService.DefaultParallelConnections;
+        AppScanDirBox.Text = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
     }
 
     private void BindEvents()
@@ -77,6 +79,12 @@ public sealed partial class MainWindow : Window
         ClearRegistryButton.Click += (_, _) => SetAllOptions(_registryOptions, false, RegistrySoftwareListBox);
         ExportMigrationButton.Click += async (_, _) => await ExportMigrationPackageAsync();
         ImportMigrationButton.Click += async (_, _) => await ImportMigrationPackageAsync();
+        ChooseAppScanDirButton.Click += async (_, _) => await ChooseFolderAsync(AppScanDirBox);
+        ScanAppsButton.Click += async (_, _) => await ScanStartMenuAppsAsync();
+        SelectAllAppsButton.Click += (_, _) => SelectAllListItems(StartMenuAppListBox);
+        ClearAppsButton.Click += (_, _) => SetAllOptions(_startMenuOptions, false, StartMenuAppListBox);
+        AddStartMenuButton.Click += async (_, _) => await AddStartMenuShortcutsAsync();
+        OpenStartMenuButton.Click += (_, _) => OpenStartMenuDirectory();
         OpenToolDirButton.Click += (_, _) => OpenToolDirectory();
         StopButton.Click += (_, _) => _taskCts?.Cancel();
     }
@@ -173,6 +181,48 @@ public sealed partial class MainWindow : Window
         bool importMachineEnvironment = IncludeMachineEnvBox.IsChecked == true;
         bool importUserSoftwareRegistry = IncludeUserRegistryBox.IsChecked == true;
         await RunTaskAsync("正在导入系统迁移包", () => _migrationService.ImportPackageAsync(packagePath, importMachineEnvironment, importUserSoftwareRegistry, AppendLog, _taskCts!.Token));
+    }
+
+    private async Task ScanStartMenuAppsAsync()
+    {
+        string rootDir = (AppScanDirBox.Text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(rootDir) || !Directory.Exists(rootDir))
+        {
+            await ShowMessageAsync("请选择已拷贝应用所在目录");
+            return;
+        }
+
+        await RunTaskAsync("正在扫描应用", () =>
+        {
+            IReadOnlyList<MigrationOption> options = _migrationService.GetApplicationOptions(rootDir, AppendLog, _taskCts!.Token);
+            Dispatcher.UIThread.Post(() =>
+            {
+                _startMenuOptions.Clear();
+                for (int i = 0; i < options.Count; i++)
+                {
+                    SelectableMigrationOption option = new SelectableMigrationOption(options[i]);
+                    option.IsSelected = true;
+                    _startMenuOptions.Add(option);
+                }
+
+                StartMenuAppListBox.ItemsSource = null;
+                StartMenuAppListBox.ItemsSource = _startMenuOptions.ToArray();
+                StatusText.Text = "扫描到 " + _startMenuOptions.Count + " 个应用";
+            });
+            return Task.CompletedTask;
+        });
+    }
+
+    private async Task AddStartMenuShortcutsAsync()
+    {
+        List<string> executablePaths = GetSelectedOptionKeys(StartMenuAppListBox);
+        if (executablePaths.Count == 0)
+        {
+            await ShowMessageAsync("请先扫描并勾选要添加到开始菜单的应用");
+            return;
+        }
+
+        await RunTaskAsync("正在添加开始菜单快捷方式", () => _migrationService.AddStartMenuShortcutsAsync(executablePaths, AppendLog, _taskCts!.Token));
     }
 
     private async Task DiscoverReceiverAsync(TextBox targetHostBox, int port)
@@ -720,6 +770,17 @@ public sealed partial class MainWindow : Window
         Process.Start(new ProcessStartInfo
         {
             FileName = AppContext.BaseDirectory,
+            UseShellExecute = true
+        });
+    }
+
+    private static void OpenStartMenuDirectory()
+    {
+        string startMenuDir = SystemMigrationService.GetStartMenuProgramsDirectory();
+        Directory.CreateDirectory(startMenuDir);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = startMenuDir,
             UseShellExecute = true
         });
     }
