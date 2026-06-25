@@ -13,7 +13,7 @@ Tools\LanFileTransfer\publish\win-x64-single\LanFileTransfer.exe
 如果原 exe 正在运行导致无法覆盖，临时新版可能发布在：
 
 ```text
-Tools\LanFileTransfer\publish\win-x64-single-v3\LanFileTransfer.exe
+Tools\LanFileTransfer\publish\win-x64-single-v5\LanFileTransfer.exe
 ```
 
 这个 exe 已包含 .NET 运行时和 Avalonia 依赖，拷到另一台 Windows x64 电脑上即可运行。`LanFileTransfer.pdb` 是调试符号文件，不需要一起拷贝。
@@ -101,6 +101,8 @@ Tools\LanFileTransfer\bin\Release\net8.0\LanFileTransfer.exe
 3. 勾选要添加的程序，点击“添加到开始菜单”。
 
 也可以点击“扫描常用目录”，会扫描桌面、下载、`Program Files`、`Program Files (x86)`、`%LocalAppData%\Programs`，以及各固定磁盘根目录下的 `Apps`、`Programs`、`Software` 等常见应用目录。工具会默认跳过卸载器、安装器、更新器等常见辅助程序；如果过滤后没有结果，但确实发现了 `.exe`，会把这些候选显示出来，方便手动确认。
+
+扫描时会在“开始菜单”页内显示独立进度。扫描结果列表支持滚动，并会尽量显示每个 `.exe` 自带图标。
 
 快捷方式会写入当前用户的开始菜单程序目录，不需要管理员权限。可以点击“打开开始菜单目录”查看生成结果。
 

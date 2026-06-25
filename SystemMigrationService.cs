@@ -73,22 +73,22 @@ internal sealed class SystemMigrationService
         return options;
     }
 
-    public IReadOnlyList<MigrationOption> GetApplicationOptions(string rootDir, Action<string>? log, CancellationToken cancellationToken)
+    public IReadOnlyList<MigrationOption> GetApplicationOptions(string rootDir, Action<string>? log, Action<ApplicationScanProgress>? progress, CancellationToken cancellationToken)
     {
         if (!Directory.Exists(rootDir))
         {
             throw new DirectoryNotFoundException("找不到应用目录: " + rootDir);
         }
 
-        return GetApplicationOptions(new[] { rootDir }, log, cancellationToken);
+        return GetApplicationOptions(new[] { rootDir }, log, progress, cancellationToken);
     }
 
-    public IReadOnlyList<MigrationOption> GetCommonApplicationOptions(Action<string>? log, CancellationToken cancellationToken)
+    public IReadOnlyList<MigrationOption> GetCommonApplicationOptions(Action<string>? log, Action<ApplicationScanProgress>? progress, CancellationToken cancellationToken)
     {
-        return GetApplicationOptions(GetCommonApplicationDirectories(), log, cancellationToken);
+        return GetApplicationOptions(GetCommonApplicationDirectories(), log, progress, cancellationToken);
     }
 
-    private IReadOnlyList<MigrationOption> GetApplicationOptions(IReadOnlyList<string> rootDirs, Action<string>? log, CancellationToken cancellationToken)
+    private IReadOnlyList<MigrationOption> GetApplicationOptions(IReadOnlyList<string> rootDirs, Action<string>? log, Action<ApplicationScanProgress>? progress, CancellationToken cancellationToken)
     {
         List<MigrationOption> options = new List<MigrationOption>();
         List<MigrationOption> fallbackOptions = new List<MigrationOption>();
@@ -98,6 +98,7 @@ internal sealed class SystemMigrationService
         int scannedDirs = 0;
         int foundExeCount = 0;
         int skippedExeCount = 0;
+        int discoveredDirs = 0;
         for (int i = 0; i < rootDirs.Count; i++)
         {
             string rootDir = rootDirs[i];
@@ -107,6 +108,7 @@ internal sealed class SystemMigrationService
             }
 
             pendingDirs.Push(rootDir);
+            discoveredDirs++;
             Log(log, "正在扫描应用目录: " + rootDir);
         }
 
@@ -158,11 +160,15 @@ internal sealed class SystemMigrationService
                 for (int i = 0; i < childDirs.Length; i++)
                 {
                     pendingDirs.Push(childDirs[i]);
+                    discoveredDirs++;
                 }
+
+                ReportScanProgress(progress, scannedDirs, discoveredDirs, foundExeCount, options.Count, "正在扫描: " + dir);
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is PathTooLongException)
             {
                 Log(log, "[跳过目录] " + dir + "，原因: " + ex.Message);
+                ReportScanProgress(progress, scannedDirs, discoveredDirs, foundExeCount, options.Count, "跳过目录: " + dir);
             }
         }
 
@@ -174,6 +180,7 @@ internal sealed class SystemMigrationService
 
         options.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase));
         Log(log, "应用扫描完成，扫描目录 " + scannedDirs + " 个，发现 exe " + foundExeCount + " 个，过滤 " + skippedExeCount + " 个，显示 " + options.Count + " 个");
+        ReportScanProgress(progress, scannedDirs, Math.Max(scannedDirs, discoveredDirs), foundExeCount, options.Count, "扫描完成");
         return options;
     }
 
@@ -436,6 +443,27 @@ internal sealed class SystemMigrationService
         }
     }
 
+    private static void ReportScanProgress(Action<ApplicationScanProgress>? progress, int scannedDirs, int discoveredDirs, int foundExeCount, int visibleCount, string message)
+    {
+        if (progress == null)
+        {
+            return;
+        }
+
+        double percent = 0;
+        if (discoveredDirs > 0)
+        {
+            percent = Math.Min(99, Math.Max(0, scannedDirs * 100.0 / discoveredDirs));
+        }
+
+        if (string.Equals(message, "扫描完成", StringComparison.Ordinal))
+        {
+            percent = 100;
+        }
+
+        progress(new ApplicationScanProgress(percent, scannedDirs, discoveredDirs, foundExeCount, visibleCount, message));
+    }
+
     private static bool ShouldSkipApplicationDirectory(string dir)
     {
         string name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
@@ -647,6 +675,31 @@ internal sealed class MigrationOption
     }
 }
 
+internal readonly struct ApplicationScanProgress
+{
+    public ApplicationScanProgress(double percent, int scannedDirs, int discoveredDirs, int foundExeCount, int visibleCount, string message)
+    {
+        Percent = percent;
+        ScannedDirs = scannedDirs;
+        DiscoveredDirs = discoveredDirs;
+        FoundExeCount = foundExeCount;
+        VisibleCount = visibleCount;
+        Message = message;
+    }
+
+    public double Percent { get; }
+
+    public int ScannedDirs { get; }
+
+    public int DiscoveredDirs { get; }
+
+    public int FoundExeCount { get; }
+
+    public int VisibleCount { get; }
+
+    public string Message { get; }
+}
+
 internal sealed class SelectableMigrationOption
 {
     public SelectableMigrationOption(MigrationOption option)
@@ -654,6 +707,10 @@ internal sealed class SelectableMigrationOption
         Key = option.Key;
         DisplayName = option.DisplayName;
         Detail = option.Detail;
+        if (File.Exists(option.Key))
+        {
+            Icon = MainWindow.LoadExecutableIcon(option.Key);
+        }
     }
 
     public bool IsSelected { get; set; }
@@ -663,4 +720,6 @@ internal sealed class SelectableMigrationOption
     public string DisplayName { get; }
 
     public string Detail { get; }
+
+    public Avalonia.Media.Imaging.Bitmap? Icon { get; }
 }

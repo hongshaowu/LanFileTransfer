@@ -96,7 +96,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
+    <Grid Grid.Row="1" Name="MainContentGrid" RowDefinitions="Auto,Auto,*">
       <Border Grid.Row="0"
               Background="{StaticResource PanelBrush}"
               BorderBrush="{StaticResource BorderBrush}"
@@ -260,15 +260,24 @@
           </TabItem>
 
           <TabItem Header="开始菜单">
-            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,*,Auto" Margin="18,18,18,16">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="18,18,18,16">
               <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="应用目录" />
               <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                 <TextBox Name="AppScanDirBox" Watermark="选择已拷贝应用所在目录" Margin="0,0,8,0" />
                 <Button Grid.Column="1" Name="ChooseAppScanDirButton" Content="浏览" MinWidth="78" />
               </Grid>
 
-              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="扫描结果" VerticalAlignment="Top" Margin="0,7,12,12" />
-              <Grid Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,*" Margin="0,0,0,12">
+              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="扫描进度" />
+              <Grid Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Name="StartMenuProgressText" Text="未开始" Foreground="#344054" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Name="StartMenuResultText" Text="0 个应用" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Center" />
+                </Grid>
+                <ProgressBar Grid.Row="1" Name="StartMenuProgressBar" Minimum="0" Maximum="100" Height="10" Margin="0,8,0,0" />
+              </Grid>
+
+              <TextBlock Classes="label" Grid.Row="2" Grid.Column="0" Text="扫描结果" VerticalAlignment="Top" Margin="0,7,12,12" />
+              <Grid Grid.Row="2" Grid.Column="1" RowDefinitions="Auto,*" Margin="0,0,0,12">
                 <WrapPanel Margin="0,0,0,8">
                   <Button Name="ScanAppsButton" Content="扫描应用" MinWidth="82" Margin="0,0,8,8" />
                   <Button Name="ScanCommonAppsButton" Content="扫描常用目录" MinWidth="106" Margin="0,0,8,8" />
@@ -277,14 +286,12 @@
                   <Button Classes="primary" Name="AddStartMenuButton" Content="添加到开始菜单" MinWidth="132" Margin="0,0,8,8" />
                   <Button Name="OpenStartMenuButton" Content="打开开始菜单目录" MinWidth="132" Margin="0,0,8,8" />
                 </WrapPanel>
-                <ListBox Grid.Row="1" Name="StartMenuAppListBox" MinHeight="240" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox Grid.Row="1" Name="StartMenuAppListBox" Height="300" MinHeight="300" ScrollViewer.VerticalScrollBarVisibility="Auto">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <Grid ColumnDefinitions="Auto,Auto,*" Margin="4,3">
                         <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <Border Grid.Column="1" Classes="optionIcon" VerticalAlignment="Center" Margin="0,0,8,0">
-                          <TextBlock Text="E" Foreground="#2563EB" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <Image Grid.Column="1" Source="{Binding Icon}" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <StackPanel Grid.Column="2" Spacing="1">
                           <TextBlock Text="{Binding DisplayName}" Foreground="#111827" />
                           <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="11" />
@@ -295,7 +302,7 @@
                 </ListBox>
               </Grid>
 
-              <TextBlock Grid.Row="2" Grid.Column="1"
+              <TextBlock Grid.Row="3" Grid.Column="1"
                          Text="扫描应用只扫描上方选择的目录；扫描常用目录会查找桌面、下载、Program Files 和各磁盘常见应用目录。快捷方式会添加到当前用户开始菜单。"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource MutedBrush}"
@@ -306,6 +313,7 @@
       </Border>
 
       <Border Grid.Row="1"
+              Name="TransferProgressPanel"
               Background="{StaticResource PanelBrush}"
               BorderBrush="{StaticResource BorderBrush}"
               BorderThickness="1"
@@ -322,6 +330,7 @@
       </Border>
 
       <Border Grid.Row="2"
+              Name="LogPanel"
               Background="{StaticResource PanelBrush}"
               BorderBrush="{StaticResource BorderBrush}"
               BorderThickness="1"

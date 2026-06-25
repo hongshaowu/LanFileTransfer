@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia.Media.Imaging;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
@@ -33,6 +34,7 @@ public sealed partial class MainWindow : Window
         RefreshIpInfo();
         RefreshEnvironmentList();
         RefreshRegistryList();
+        UpdateTransferPanelsVisibility();
         EnsureDirectIp();
     }
 
@@ -88,6 +90,7 @@ public sealed partial class MainWindow : Window
         OpenStartMenuButton.Click += (_, _) => OpenStartMenuDirectory();
         OpenToolDirButton.Click += (_, _) => OpenToolDirectory();
         StopButton.Click += (_, _) => _taskCts?.Cancel();
+        Tabs.SelectionChanged += (_, _) => UpdateTransferPanelsVisibility();
     }
 
     private async Task StartReceiveAsync()
@@ -193,9 +196,9 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        await RunTaskAsync("正在扫描应用", () =>
+        await RunStartMenuTaskAsync("正在扫描应用", () =>
         {
-            IReadOnlyList<MigrationOption> options = _migrationService.GetApplicationOptions(rootDir, AppendLog, _taskCts!.Token);
+            IReadOnlyList<MigrationOption> options = _migrationService.GetApplicationOptions(rootDir, AppendLog, UpdateStartMenuProgress, _taskCts!.Token);
             Dispatcher.UIThread.Post(() => SetStartMenuOptions(options));
             return Task.CompletedTask;
         });
@@ -203,9 +206,9 @@ public sealed partial class MainWindow : Window
 
     private async Task ScanCommonStartMenuAppsAsync()
     {
-        await RunTaskAsync("正在扫描常用应用目录", () =>
+        await RunStartMenuTaskAsync("正在扫描常用应用目录", () =>
         {
-            IReadOnlyList<MigrationOption> options = _migrationService.GetCommonApplicationOptions(AppendLog, _taskCts!.Token);
+            IReadOnlyList<MigrationOption> options = _migrationService.GetCommonApplicationOptions(AppendLog, UpdateStartMenuProgress, _taskCts!.Token);
             Dispatcher.UIThread.Post(() => SetStartMenuOptions(options));
             return Task.CompletedTask;
         });
@@ -220,7 +223,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        await RunTaskAsync("正在添加开始菜单快捷方式", () => _migrationService.AddStartMenuShortcutsAsync(executablePaths, AppendLog, _taskCts!.Token));
+        await RunStartMenuTaskAsync("正在添加开始菜单快捷方式", () => _migrationService.AddStartMenuShortcutsAsync(executablePaths, AppendLog, _taskCts!.Token));
     }
 
     private void SetStartMenuOptions(IReadOnlyList<MigrationOption> options)
@@ -236,6 +239,23 @@ public sealed partial class MainWindow : Window
         StartMenuAppListBox.ItemsSource = null;
         StartMenuAppListBox.ItemsSource = _startMenuOptions.ToArray();
         StatusText.Text = "扫描到 " + _startMenuOptions.Count + " 个应用";
+        StartMenuResultText.Text = _startMenuOptions.Count + " 个应用";
+        StartMenuProgressBar.Value = 100;
+        StartMenuProgressText.Text = "扫描完成";
+    }
+
+    private void UpdateStartMenuProgress(ApplicationScanProgress progress)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            StartMenuProgressBar.Value = progress.Percent;
+            StartMenuResultText.Text = "发现 " + progress.FoundExeCount + " 个 exe，显示 " + progress.VisibleCount + " 个";
+            StartMenuProgressText.Text = progress.Message
+                + "    已扫描目录: "
+                + progress.ScannedDirs
+                + " / "
+                + Math.Max(progress.ScannedDirs, progress.DiscoveredDirs);
+        });
     }
 
 
@@ -321,11 +341,81 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task RunStartMenuTaskAsync(string status, Func<Task> taskFactory)
+    {
+        if (_taskCts != null)
+        {
+            await ShowMessageAsync("当前已有任务在运行");
+            return;
+        }
+
+        _taskCts = new CancellationTokenSource();
+        SetStartMenuBusy(true, status);
+        AppendLog("========== " + status + " ==========");
+        StartMenuProgressBar.Value = 0;
+        StartMenuProgressText.Text = status;
+        StartMenuResultText.Text = "正在处理";
+
+        try
+        {
+            await Task.Run(taskFactory);
+            StatusText.Text = "完成";
+            StartMenuProgressBar.Value = 100;
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog("任务已停止");
+            StatusText.Text = "已停止";
+            StartMenuProgressText.Text = "已停止";
+        }
+        catch (Exception ex)
+        {
+            AppendLog("失败: " + ex.Message);
+            StatusText.Text = "失败";
+            StartMenuProgressText.Text = "失败";
+            await ShowMessageAsync(ex.Message);
+        }
+        finally
+        {
+            _taskCts.Dispose();
+            _taskCts = null;
+            SetStartMenuBusy(false, StatusText.Text ?? "就绪");
+        }
+    }
+
     private void SetBusy(bool busy, string status)
     {
         Tabs.IsEnabled = !busy;
         StopButton.IsEnabled = busy;
         StatusText.Text = status;
+    }
+
+    private void SetStartMenuBusy(bool busy, string status)
+    {
+        ChooseAppScanDirButton.IsEnabled = !busy;
+        ScanAppsButton.IsEnabled = !busy;
+        ScanCommonAppsButton.IsEnabled = !busy;
+        SelectAllAppsButton.IsEnabled = !busy;
+        ClearAppsButton.IsEnabled = !busy;
+        AddStartMenuButton.IsEnabled = !busy;
+        OpenStartMenuButton.IsEnabled = !busy;
+        StopButton.IsEnabled = busy;
+        StatusText.Text = status;
+    }
+
+    private void UpdateTransferPanelsVisibility()
+    {
+        bool isStartMenuTab = Tabs.SelectedIndex == 4;
+        TransferProgressPanel.IsVisible = !isStartMenuTab;
+        LogPanel.IsVisible = !isStartMenuTab;
+        if (isStartMenuTab)
+        {
+            MainContentGrid.RowDefinitions = new RowDefinitions("*,0,0");
+        }
+        else
+        {
+            MainContentGrid.RowDefinitions = new RowDefinitions("Auto,Auto,*");
+        }
     }
 
     private void AppendLog(string message)
@@ -647,6 +737,28 @@ public sealed partial class MainWindow : Window
         System.Collections.IEnumerable? source = listBox.ItemsSource;
         listBox.ItemsSource = null;
         listBox.ItemsSource = source;
+    }
+
+    internal static Bitmap? LoadExecutableIcon(string path)
+    {
+        try
+        {
+            using System.Drawing.Icon? icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
+            if (icon == null)
+            {
+                return null;
+            }
+
+            using System.Drawing.Bitmap drawingBitmap = icon.ToBitmap();
+            using MemoryStream stream = new MemoryStream();
+            drawingBitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+            stream.Position = 0;
+            return new Bitmap(stream);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private async Task ShowMessageAsync(string message)
