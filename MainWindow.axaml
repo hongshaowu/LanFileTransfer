@@ -188,7 +188,7 @@
 
           <TabItem Header="系统迁移">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="18,18,18,16">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="18,18,18,16">
               <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="迁移包" />
               <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
                 <TextBox Name="MigrationPackageBox" Watermark="选择或输入迁移包 zip 路径" Margin="0,0,8,0" />
@@ -250,23 +250,34 @@
                 <Button Name="ImportMigrationButton" Content="导入迁移包" MinWidth="112" />
               </StackPanel>
 
-              <TextBlock Classes="label" Grid.Row="4" Grid.Column="0" Text="开始菜单" />
-              <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+              <TextBlock Grid.Row="4" Grid.Column="1"
+                         Text="环境变量和注册表都只会迁移列表中选中的项目。导入前请确认目标电脑已安装对应软件。"
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource MutedBrush}"
+                         FontSize="12" />
+            </Grid>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="开始菜单">
+            <Grid ColumnDefinitions="124,*" RowDefinitions="Auto,*,Auto" Margin="18,18,18,16">
+              <TextBlock Classes="label" Grid.Row="0" Grid.Column="0" Text="应用目录" />
+              <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                 <TextBox Name="AppScanDirBox" Watermark="选择已拷贝应用所在目录" Margin="0,0,8,0" />
                 <Button Grid.Column="1" Name="ChooseAppScanDirButton" Content="浏览" MinWidth="78" />
               </Grid>
 
-              <TextBlock Classes="label" Grid.Row="5" Grid.Column="0" Text="扫描结果" VerticalAlignment="Top" Margin="0,7,12,12" />
-              <Grid Grid.Row="5" Grid.Column="1" RowDefinitions="Auto,*" Margin="0,0,0,12">
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,6">
-                  <Button Name="ScanAppsButton" Content="扫描应用" MinWidth="82" />
-                  <Button Name="ScanCommonAppsButton" Content="扫描常用目录" MinWidth="106" />
-                  <Button Name="SelectAllAppsButton" Content="全选" MinWidth="70" />
-                  <Button Name="ClearAppsButton" Content="清空" MinWidth="70" />
-                  <Button Classes="primary" Name="AddStartMenuButton" Content="添加到开始菜单" MinWidth="132" />
-                  <Button Name="OpenStartMenuButton" Content="打开开始菜单目录" MinWidth="132" />
-                </StackPanel>
-                <ListBox Grid.Row="1" Name="StartMenuAppListBox" Height="150" MaxHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto">
+              <TextBlock Classes="label" Grid.Row="1" Grid.Column="0" Text="扫描结果" VerticalAlignment="Top" Margin="0,7,12,12" />
+              <Grid Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,*" Margin="0,0,0,12">
+                <WrapPanel Margin="0,0,0,8">
+                  <Button Name="ScanAppsButton" Content="扫描应用" MinWidth="82" Margin="0,0,8,8" />
+                  <Button Name="ScanCommonAppsButton" Content="扫描常用目录" MinWidth="106" Margin="0,0,8,8" />
+                  <Button Name="SelectAllAppsButton" Content="全选" MinWidth="70" Margin="0,0,8,8" />
+                  <Button Name="ClearAppsButton" Content="清空" MinWidth="70" Margin="0,0,8,8" />
+                  <Button Classes="primary" Name="AddStartMenuButton" Content="添加到开始菜单" MinWidth="132" Margin="0,0,8,8" />
+                  <Button Name="OpenStartMenuButton" Content="打开开始菜单目录" MinWidth="132" Margin="0,0,8,8" />
+                </WrapPanel>
+                <ListBox Grid.Row="1" Name="StartMenuAppListBox" MinHeight="240" ScrollViewer.VerticalScrollBarVisibility="Auto">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <Grid ColumnDefinitions="Auto,Auto,*" Margin="4,3">
@@ -284,13 +295,12 @@
                 </ListBox>
               </Grid>
 
-              <TextBlock Grid.Row="6" Grid.Column="1"
-                         Text="环境变量和注册表都只会迁移列表中选中的项目。导入前请确认目标电脑已安装对应软件。"
+              <TextBlock Grid.Row="2" Grid.Column="1"
+                         Text="扫描应用只扫描上方选择的目录；扫描常用目录会查找桌面、下载、Program Files 和各磁盘常见应用目录。快捷方式会添加到当前用户开始菜单。"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource MutedBrush}"
                          FontSize="12" />
             </Grid>
-            </ScrollViewer>
           </TabItem>
         </TabControl>
       </Border>
