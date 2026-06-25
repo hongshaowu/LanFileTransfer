@@ -260,6 +260,7 @@
               <Grid Grid.Row="5" Grid.Column="1" RowDefinitions="Auto,*" Margin="0,0,0,12">
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,6">
                   <Button Name="ScanAppsButton" Content="扫描应用" MinWidth="82" />
+                  <Button Name="ScanCommonAppsButton" Content="扫描常用目录" MinWidth="106" />
                   <Button Name="SelectAllAppsButton" Content="全选" MinWidth="70" />
                   <Button Name="ClearAppsButton" Content="清空" MinWidth="70" />
                   <Button Classes="primary" Name="AddStartMenuButton" Content="添加到开始菜单" MinWidth="132" />

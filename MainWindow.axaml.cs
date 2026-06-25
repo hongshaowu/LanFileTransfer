@@ -81,6 +81,7 @@ public sealed partial class MainWindow : Window
         ImportMigrationButton.Click += async (_, _) => await ImportMigrationPackageAsync();
         ChooseAppScanDirButton.Click += async (_, _) => await ChooseFolderAsync(AppScanDirBox);
         ScanAppsButton.Click += async (_, _) => await ScanStartMenuAppsAsync();
+        ScanCommonAppsButton.Click += async (_, _) => await ScanCommonStartMenuAppsAsync();
         SelectAllAppsButton.Click += (_, _) => SelectAllListItems(StartMenuAppListBox);
         ClearAppsButton.Click += (_, _) => SetAllOptions(_startMenuOptions, false, StartMenuAppListBox);
         AddStartMenuButton.Click += async (_, _) => await AddStartMenuShortcutsAsync();
@@ -195,20 +196,17 @@ public sealed partial class MainWindow : Window
         await RunTaskAsync("正在扫描应用", () =>
         {
             IReadOnlyList<MigrationOption> options = _migrationService.GetApplicationOptions(rootDir, AppendLog, _taskCts!.Token);
-            Dispatcher.UIThread.Post(() =>
-            {
-                _startMenuOptions.Clear();
-                for (int i = 0; i < options.Count; i++)
-                {
-                    SelectableMigrationOption option = new SelectableMigrationOption(options[i]);
-                    option.IsSelected = true;
-                    _startMenuOptions.Add(option);
-                }
+            Dispatcher.UIThread.Post(() => SetStartMenuOptions(options));
+            return Task.CompletedTask;
+        });
+    }
 
-                StartMenuAppListBox.ItemsSource = null;
-                StartMenuAppListBox.ItemsSource = _startMenuOptions.ToArray();
-                StatusText.Text = "扫描到 " + _startMenuOptions.Count + " 个应用";
-            });
+    private async Task ScanCommonStartMenuAppsAsync()
+    {
+        await RunTaskAsync("正在扫描常用应用目录", () =>
+        {
+            IReadOnlyList<MigrationOption> options = _migrationService.GetCommonApplicationOptions(AppendLog, _taskCts!.Token);
+            Dispatcher.UIThread.Post(() => SetStartMenuOptions(options));
             return Task.CompletedTask;
         });
     }
@@ -224,6 +222,22 @@ public sealed partial class MainWindow : Window
 
         await RunTaskAsync("正在添加开始菜单快捷方式", () => _migrationService.AddStartMenuShortcutsAsync(executablePaths, AppendLog, _taskCts!.Token));
     }
+
+    private void SetStartMenuOptions(IReadOnlyList<MigrationOption> options)
+    {
+        _startMenuOptions.Clear();
+        for (int i = 0; i < options.Count; i++)
+        {
+            SelectableMigrationOption option = new SelectableMigrationOption(options[i]);
+            option.IsSelected = true;
+            _startMenuOptions.Add(option);
+        }
+
+        StartMenuAppListBox.ItemsSource = null;
+        StartMenuAppListBox.ItemsSource = _startMenuOptions.ToArray();
+        StatusText.Text = "扫描到 " + _startMenuOptions.Count + " 个应用";
+    }
+
 
     private async Task DiscoverReceiverAsync(TextBox targetHostBox, int port)
     {

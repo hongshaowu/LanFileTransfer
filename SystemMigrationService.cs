@@ -80,11 +80,35 @@ internal sealed class SystemMigrationService
             throw new DirectoryNotFoundException("找不到应用目录: " + rootDir);
         }
 
+        return GetApplicationOptions(new[] { rootDir }, log, cancellationToken);
+    }
+
+    public IReadOnlyList<MigrationOption> GetCommonApplicationOptions(Action<string>? log, CancellationToken cancellationToken)
+    {
+        return GetApplicationOptions(GetCommonApplicationDirectories(), log, cancellationToken);
+    }
+
+    private IReadOnlyList<MigrationOption> GetApplicationOptions(IReadOnlyList<string> rootDirs, Action<string>? log, CancellationToken cancellationToken)
+    {
         List<MigrationOption> options = new List<MigrationOption>();
+        List<MigrationOption> fallbackOptions = new List<MigrationOption>();
         HashSet<string> added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> fallbackAdded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Stack<string> pendingDirs = new Stack<string>();
-        pendingDirs.Push(rootDir);
-        Log(log, "正在扫描应用目录: " + rootDir);
+        int scannedDirs = 0;
+        int foundExeCount = 0;
+        int skippedExeCount = 0;
+        for (int i = 0; i < rootDirs.Count; i++)
+        {
+            string rootDir = rootDirs[i];
+            if (string.IsNullOrWhiteSpace(rootDir) || !Directory.Exists(rootDir))
+            {
+                continue;
+            }
+
+            pendingDirs.Push(rootDir);
+            Log(log, "正在扫描应用目录: " + rootDir);
+        }
 
         while (pendingDirs.Count > 0)
         {
@@ -97,12 +121,13 @@ internal sealed class SystemMigrationService
 
             try
             {
+                scannedDirs++;
                 string[] files = Directory.GetFiles(dir, "*.exe", SearchOption.TopDirectoryOnly);
                 for (int i = 0; i < files.Length; i++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string path = files[i];
-                    if (added.Contains(path) || ShouldSkipExecutable(path))
+                    if (added.Contains(path) || fallbackAdded.Contains(path))
                     {
                         continue;
                     }
@@ -113,9 +138,20 @@ internal sealed class SystemMigrationService
                         continue;
                     }
 
+                    foundExeCount++;
                     string displayName = Path.GetFileNameWithoutExtension(path);
-                    options.Add(new MigrationOption(path, displayName, path));
-                    added.Add(path);
+                    MigrationOption option = new MigrationOption(path, displayName, path);
+                    if (ShouldSkipExecutable(path))
+                    {
+                        fallbackOptions.Add(option);
+                        fallbackAdded.Add(path);
+                        skippedExeCount++;
+                    }
+                    else
+                    {
+                        options.Add(option);
+                        added.Add(path);
+                    }
                 }
 
                 string[] childDirs = Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly);
@@ -130,8 +166,14 @@ internal sealed class SystemMigrationService
             }
         }
 
+        if (options.Count == 0 && fallbackOptions.Count > 0)
+        {
+            Log(log, "按默认过滤规则没有主程序结果，已显示被过滤的 exe 候选，请手动勾选确认");
+            options.AddRange(fallbackOptions);
+        }
+
         options.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase));
-        Log(log, "应用扫描完成，找到 " + options.Count + " 个可添加项");
+        Log(log, "应用扫描完成，扫描目录 " + scannedDirs + " 个，发现 exe " + foundExeCount + " 个，过滤 " + skippedExeCount + " 个，显示 " + options.Count + " 个");
         return options;
     }
 
@@ -406,6 +448,54 @@ internal sealed class SystemMigrationService
         }
 
         return false;
+    }
+
+    private static IReadOnlyList<string> GetCommonApplicationDirectories()
+    {
+        List<string> dirs = new List<string>();
+        AddExistingDirectory(dirs, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+        AddExistingDirectory(dirs, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
+        AddExistingDirectory(dirs, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
+        AddExistingDirectory(dirs, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
+        AddExistingDirectory(dirs, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs"));
+        AddExistingDirectory(dirs, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Windows", "Start Menu", "Programs"));
+
+        DriveInfo[] drives = DriveInfo.GetDrives();
+        for (int i = 0; i < drives.Length; i++)
+        {
+            DriveInfo drive = drives[i];
+            if (!drive.IsReady || drive.DriveType != DriveType.Fixed)
+            {
+                continue;
+            }
+
+            string root = drive.RootDirectory.FullName;
+            AddExistingDirectory(dirs, Path.Combine(root, "Apps"));
+            AddExistingDirectory(dirs, Path.Combine(root, "Program Files"));
+            AddExistingDirectory(dirs, Path.Combine(root, "Program Files (x86)"));
+            AddExistingDirectory(dirs, Path.Combine(root, "Programs"));
+            AddExistingDirectory(dirs, Path.Combine(root, "Software"));
+        }
+
+        return dirs;
+    }
+
+    private static void AddExistingDirectory(List<string> dirs, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        {
+            return;
+        }
+
+        for (int i = 0; i < dirs.Count; i++)
+        {
+            if (string.Equals(dirs[i], path, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        dirs.Add(path);
     }
 
     private static bool ShouldSkipExecutable(string path)
